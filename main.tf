@@ -257,7 +257,7 @@ resource "aws_security_group" "lb" {
 }
 
 
-resource "aws_instance" "EC2_private" {
+resource "aws_instance" "EC2_private_0" {
   count         = var.nro_pri_instances
   ami           = var.ec2_image
   instance_type = var.ec2_instype
@@ -275,11 +275,11 @@ resource "aws_instance" "EC2_private" {
   }
 }
 
-resource "aws_instance" "EC2_public" {
+resource "aws_instance" "EC2_private_1" {
   count         = var.nro_pub_instances
   ami           = var.ec2_image
   instance_type = var.ec2_instype
-  subnet_id     = aws_subnet.subnets_public.id
+  subnet_id     = aws_subnet.subnets_private_1.id
   user_data = <<EOF
           #!/bin/bash
           set -x
