@@ -209,8 +209,9 @@ resource "aws_lb" "ALB" {
   name = "mentoria"
   load_balancer_type = "application"
   security_groups = [ aws_security_group.lb.id ]
-  subnets = [ "subnets_private_0", "subnets_private_1"  ]
-
+  # subnets = [ aws_subnet.subnets_private_0, aws_subnet.subnets_private_1  ]
+  subnets = ["${aws_subnet.subnets_private_0.id}", "${aws_subnet.subnets_private_1.id}"]
+   
 }
 
 resource "aws_lb_listener" "http" {
@@ -249,7 +250,7 @@ resource "aws_security_group" "lb" {
   egress {
     from_port = "80"
     to_port   = "80"
-    protocol  = "ALL"
+    protocol  = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -260,7 +261,6 @@ resource "aws_security_group" "lb" {
 
 
 resource "aws_instance" "EC2_private_0" {
-  count         = var.nro_pri_instances
   ami           = var.ec2_image
   instance_type = var.ec2_instype
   subnet_id     = aws_subnet.subnets_private_0.id
@@ -273,12 +273,11 @@ resource "aws_instance" "EC2_private_0" {
           echo "Hello World" > /var/www/html/index.html
   EOF
   tags = {
-    Name = "Instance-${count.index + 0}"
+    Name = "Instance-0"
   }
 }
 
 resource "aws_instance" "EC2_private_1" {
-  count         = var.nro_pub_instances
   ami           = var.ec2_image
   instance_type = var.ec2_instype
   subnet_id     = aws_subnet.subnets_private_1.id
@@ -291,7 +290,7 @@ resource "aws_instance" "EC2_private_1" {
           echo "Hello World" > /var/www/html/index.html
   EOF
   tags = {
-    Name = "Instance-${count.index + 0}"
+    Name = "Instance-1"
   }
 }
 
