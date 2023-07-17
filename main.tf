@@ -22,8 +22,12 @@ resource "aws_internet_gateway" "ig" {
 # 3. Elastic-IP (eip) for NAT
 #
 
-resource "aws_eip" "nat_eip" {
-  count      = var.nro_subnets_private
+resource "aws_eip" "nat_eip_0" {
+  #vpc        = true                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+  depends_on = [aws_internet_gateway.ig]
+}
+
+resource "aws_eip" "nat_eip_1" {
   #vpc        = true                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
   depends_on = [aws_internet_gateway.ig]
 }
@@ -32,16 +36,23 @@ resource "aws_eip" "nat_eip" {
 # 4. NAT
 #
 
-resource "aws_nat_gateway" "nat" {
-  count         = var.nro_subnets_private
-  allocation_id = aws_eip.nat_eip[count.index].id
-  subnet_id     = aws_subnet.subnets_private[count.index].id
+resource "aws_nat_gateway" "nat_0" {
+  allocation_id = aws_eip.nat_eip_0.id
+  subnet_id     = aws_subnet.subnets_private_0.id
 
   tags = {
     Name = "nat"
   }
 }
 
+resource "aws_nat_gateway" "nat_1" {
+  allocation_id = aws_eip.nat_eip_1.id
+  subnet_id     = aws_subnet.subnets_private_1.id
+
+  tags = {
+    Name = "nat"
+  }
+}
 #
 # Important:
 # This local definition calculates the subnet ranges
@@ -50,8 +61,9 @@ resource "aws_nat_gateway" "nat" {
 #
 
 locals {
-  subnet_cidrs = ["192.168.0.0/16", "192.168.0.0/24", "192.168,1,0/24", "192,168,2,0/24"]
+  subnet_cidrs = ["192.168.0.0/16", "192.168.0.0/24", "192.168.1.0/24", "192.168.2.0/24"]
 }
+
 
 #
 # Creating Subnets
@@ -61,27 +73,34 @@ locals {
 # 5. Public subnets
 #
 resource "aws_subnet" "subnets_public" {
-  count      = var.nro_subnets_public
   vpc_id     = aws_vpc.vpc_mentoring2.id
-  cidr_block = local.subnet_cidrs[count.index + 1]
+  cidr_block = local.subnet_cidrs[1]
 
   tags = {
-    Name = "Subnet_Public-${count.index + 1}"
+    Name = "Subnet_Public-1"
   }
 }
 
 #
 # 6. Private subnets
 #
-resource "aws_subnet" "subnets_private" {
-  count      = var.nro_subnets_private
+resource "aws_subnet" "subnets_private_0" {
   vpc_id     = aws_vpc.vpc_mentoring2.id
-  cidr_block = local.subnet_cidrs[count.index + 2]
+  cidr_block = local.subnet_cidrs[2]
 
   tags = {
-    Name = "Subnet_Private-${count.index + 1}"
+    Name = "Subnet_Private-1"
   }
 }
+resource "aws_subnet" "subnets_private_1" {
+  vpc_id     = aws_vpc.vpc_mentoring2.id
+  cidr_block = local.subnet_cidrs[3]
+
+  tags = {
+    Name = "Subnet_Private-2"
+  }
+}
+
 
 #
 # 7. Routing tables to route traffic for Private Subnet
@@ -114,10 +133,8 @@ resource "aws_route_table" "route_table_public" {
 #
 
 resource "aws_route" "public_internet_gateway" {
-  count                  = var.nro_subnets_public
   route_table_id         = aws_route_table.route_table_public.id
   destination_cidr_block = "0.0.0.0/0"
-  # gateway_id             = aws_internet_gateway.ig[count.index].id
   gateway_id             = aws_internet_gateway.ig.id
 
 }
@@ -126,30 +143,38 @@ resource "aws_route" "public_internet_gateway" {
 # 10. Route for NAT
 #
 
-resource "aws_route" "private_nat_gateway" {
-  count                  = var.nro_subnets_private
+resource "aws_route" "private_nat_gateway_0" {
   route_table_id         = aws_route_table.route_table_private.id
   destination_cidr_block = "0.0.0.0/0"
-  # nat_gateway_id         = aws_nat_gateway.nat.ig[count.index].id
-  nat_gateway_id         = aws_nat_gateway.nat[count.index].id 
+  nat_gateway_id         = aws_nat_gateway.nat_0.id 
 }
+
+#resource "aws_route" "private_nat_gateway_1" {
+#  route_table_id         = aws_route_table.route_table_private.id
+#  destination_cidr_block = "0.0.0.0/0"
+#  nat_gateway_id         = aws_nat_gateway.nat_1.id
+#}
+
 
 #
 # 11. Route table associations for both Public & Private Subnets
 #
 
-# resource "aws_route_table_association" "public" {
-#  count          = length(var.public_subnets_cidr)
-#  subnet_id      = element(aws_subnet.public_subnet.*.id, count.index)
-#  route_table_id = aws_route_table.public.id
-#}
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.subnets_public.id
+  route_table_id = aws_route_table.route_table_public.id
+}
 
-# resource "aws_route_table_association" "private" {
-#  count          = length(var.private_subnets_cidr)
-#  subnet_id      = element(aws_subnet.private_subnet.*.id, count.index)
-#  route_table_id = aws_route_table.private.id
-#}
+resource "aws_route_table_association" "private_0" {
+  subnet_id      = aws_subnet.subnets_private_0.id
+  route_table_id = aws_route_table.route_table_private.id
+}
 
+
+resource "aws_route_table_association" "private_1" {
+  subnet_id      = aws_subnet.subnets_private_1.id
+  route_table_id = aws_route_table.route_table_private.id
+}
 #
 # 12. Default Security Group of VPC
 #
@@ -184,7 +209,7 @@ resource "aws_instance" "EC2_private" {
   count         = var.nro_pri_instances
   ami           = var.ec2_image
   instance_type = var.ec2_instype
-  subnet_id     = aws_subnet.subnets_private[count.index].id
+  subnet_id     = aws_subnet.subnets_private_0.id
   tags = {
     Name = "Instance-${count.index + 0}"
   }
@@ -194,7 +219,7 @@ resource "aws_instance" "EC2_public" {
   count         = var.nro_pub_instances
   ami           = var.ec2_image
   instance_type = var.ec2_instype
-  subnet_id     = aws_subnet.subnets_public[count.index].id
+  subnet_id     = aws_subnet.subnets_public.id
   tags = {
     Name = "Instance-${count.index + 0}"
   }
