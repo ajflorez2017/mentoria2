@@ -210,6 +210,14 @@ resource "aws_instance" "EC2_private" {
   ami           = var.ec2_image
   instance_type = var.ec2_instype
   subnet_id     = aws_subnet.subnets_private_0.id
+  user_data = <<EOF
+          #!/bin/bash
+          set -x
+          yum install -y httpd.x86_64
+          systemctl start httpd.service
+          systemctl enable httpd.service
+          echo "Hello World" > /var/www/html/index.html
+  EOF
   tags = {
     Name = "Instance-${count.index + 0}"
   }
@@ -220,6 +228,14 @@ resource "aws_instance" "EC2_public" {
   ami           = var.ec2_image
   instance_type = var.ec2_instype
   subnet_id     = aws_subnet.subnets_public.id
+  user_data = <<EOF
+          #!/bin/bash
+          set -x
+          yum install -y httpd.x86_64
+          systemctl start httpd.service
+          systemctl enable httpd.service
+          echo "Hello World" > /var/www/html/index.html
+  EOF
   tags = {
     Name = "Instance-${count.index + 0}"
   }
