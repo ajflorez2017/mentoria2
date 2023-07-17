@@ -205,6 +205,58 @@ resource "aws_security_group" "default" {
   }
 }
 
+resource "aws_lb" "ALB" {
+  name = "mentoria"
+  load_balancer_type = "application"
+  security_groups = [ aws_security_group.lb.id ]
+  subnets = [ "subnets_private_0", "subnets_private_1"  ]
+
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.ALB.arn
+  port = 80
+  protocol = "HTTP"
+
+  # By default, return a simple 404 page
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      
+      content_type = "text/plain"
+      message_body = "404: page not found"
+      status_code = 404
+    }
+  }
+
+}
+
+resource "aws_security_group" "lb" {
+  name        = "${var.environment}-default-lb"
+  description = "Default SG to load balancer"
+  
+
+  ingress {
+    from_port = "80"
+    to_port   = "80"
+    protocol  = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port = "80"
+    to_port   = "80"
+    protocol  = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Environment = "${var.environment}"
+  }
+}
+
+
 resource "aws_instance" "EC2_private" {
   count         = var.nro_pri_instances
   ami           = var.ec2_image
