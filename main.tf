@@ -90,8 +90,8 @@ data "aws_availability_zones" "available" {
 }
 
 resource "aws_subnet" "subnets_private_0" {
-  vpc_id     = aws_vpc.vpc_mentoring2.id
-  cidr_block = local.subnet_cidrs[2]
+  vpc_id            = aws_vpc.vpc_mentoring2.id
+  cidr_block        = local.subnet_cidrs[2]
   availability_zone = data.aws_availability_zones.available.names[0]
 
   tags = {
@@ -99,8 +99,8 @@ resource "aws_subnet" "subnets_private_0" {
   }
 }
 resource "aws_subnet" "subnets_private_1" {
-  vpc_id     = aws_vpc.vpc_mentoring2.id
-  cidr_block = local.subnet_cidrs[3]
+  vpc_id            = aws_vpc.vpc_mentoring2.id
+  cidr_block        = local.subnet_cidrs[3]
   availability_zone = data.aws_availability_zones.available.names[1]
   tags = {
     Name = "Subnet_Private-2"
@@ -152,7 +152,7 @@ resource "aws_route" "public_internet_gateway" {
 resource "aws_route" "private_nat_gateway_0" {
   route_table_id         = aws_route_table.route_table_private.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat_0.id 
+  nat_gateway_id         = aws_nat_gateway.nat_0.id
 }
 
 #resource "aws_route" "private_nat_gateway_1" {
@@ -192,17 +192,17 @@ resource "aws_route_table_association" "private_1" {
 
 resource "aws_security_group" "sg_webserver" {
 
-    name = "sg_webserver"
-    vpc_id = aws_vpc.vpc_mentoring2.id
+  name   = "sg_webserver"
+  vpc_id = aws_vpc.vpc_mentoring2.id
 
-    ingress  {
-      description   = "ingress to web server"
-      from_port     = var.ini_port
-      to_port       = var.fin_port
-      protocol      = "tcp"      
-      cidr_blocks   = [ "0.0.0.0/0" ]
-    } 
-  
+  ingress {
+    description = "ingress to web server"
+    from_port   = var.ini_port
+    to_port     = var.fin_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
 }
 
 #---------------------------------------------------------------
@@ -211,26 +211,26 @@ resource "aws_security_group" "sg_webserver" {
 #---------------------------------------------------------------
 
 resource "aws_security_group" "sg_lb" {
-  name = "sg_lb"
+  name   = "sg_lb"
   vpc_id = aws_vpc.vpc_mentoring2.id
 
   # Allow inbound HTTP requests
 
   ingress {
-    from_port     = var.ii_port
-    to_port       = var.if_port
-    protocol      = "tcp"
-    cidr_blocks   = ["0.0.0.0/0"]
+    from_port   = var.ii_port
+    to_port     = var.if_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
 
   # Allow outbound requests
 
   egress {
-    from_port     = var.ei_port
-    to_port       = var.ef_port
-    protocol      = "tcp"
-    cidr_blocks   = ["0.0.0.0/0"]
+    from_port   = var.ei_port
+    to_port     = var.ef_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
 }
@@ -252,7 +252,7 @@ resource "aws_security_group" "sg_lb" {
 
 # data "aws_subnets" "vpc_mentoring2" {
 # # vpc_id = data.aws_vpc.mentoria2_vpc.id
-  
+
 #   filter {
 #     name                = "vpc-id"
 #     values              = [data.aws_vpc.vpc_mentoring2.id]
@@ -264,27 +264,52 @@ output "vpc_id" {
   value       = aws_vpc.vpc_mentoring2.id
 }
 
+
+#---------------------------------------------------------------
+# Autoscaling group
+#
+#---------------------------------------------------------------
+
+
+resource "aws_autoscaling_group" "asg_webserver" {
+  launch_configuration = aws_launch_configuration.cfg_webserver.name
+  #vpc_zone_identifier     = data.aws_subnets.vpc_mentoring2.ids
+  vpc_zone_identifier = [aws_subnet.subnets_private_0.id, aws_subnet.subnets_private_1.id]
+  target_group_arns   = [aws_lb_target_group.tg-webserver.arn]
+  health_check_type   = "ELB"
+
+  min_size = var.min_size
+  max_size = var.max_size
+
+  tag {
+    key                 = "Name"
+    value               = "SG-personal-project-bench"
+    propagate_at_launch = true
+  }
+}
+
+
 #---------------------------------------------------------------
 # Target group for web servers balancing
 #
 #---------------------------------------------------------------
 
 resource "aws_lb_target_group" "tg-webserver" {
-  name            = "tg-webserver"
-  port            = var.tg_port
-  protocol        = "HTTP"
+  name     = "tg-webserver"
+  port     = var.tg_port
+  protocol = "HTTP"
   # vpc_id          = data.aws_vpc.vpc_mentoring2.id
-  vpc_id          = aws_vpc.vpc_mentoring2.id
+  vpc_id = aws_vpc.vpc_mentoring2.id
 
 
   health_check {
-    path                  = "/"
-    protocol              = "HTTP"
-    matcher               = "200"
-    interval              = 15
-    timeout               = 3
-    healthy_threshold     = 2
-    unhealthy_threshold   = 2
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200"
+    interval            = 15
+    timeout             = 3
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
   }
 }
 
@@ -293,23 +318,23 @@ resource "aws_lb_target_group" "tg-webserver" {
 #
 #---------------------------------------------------------------
 
-resource "aws_lb_target_group_attachment" "tg_attachment_webserver" {
-    target_group_arn = aws_lb_target_group.tg-webserver.arn
-    target_id = aws_autoscaling_group.asg_webserver.id
-    port = var.tg_port
-  
-}
+# resource "aws_lb_target_group_attachment" "tg_attachment_webserver" {
+#   target_group_arn = aws_lb_target_group.tg-webserver.arn
+#   target_id        = aws_autoscaling_group.asg_webserver.id
+#   port             = var.tg_port
+
+# }
 
 #---------------------------------------------------------------
 # Load Balancer definition
 #---------------------------------------------------------------
 
 resource "aws_lb" "lb_webserver" {
-  name                    = "lb-webserver"
-  load_balancer_type      = "application"
+  name               = "lb-webserver"
+  load_balancer_type = "application"
   # subnets                 = data.aws_subnets.vpc_mentoring2
-  subnets                 = [aws_subnet.subnets_private_0.id, aws_subnet.subnets_private_1.id]
-  security_groups         = [aws_security_group.sg_lb.id]
+  subnets         = [aws_subnet.subnets_private_0.id, aws_subnet.subnets_private_1.id]
+  security_groups = [aws_security_group.sg_lb.id]
 
 }
 
@@ -320,14 +345,25 @@ resource "aws_lb" "lb_webserver" {
 
 resource "aws_lb_listener" "http" {
 
-  load_balancer_arn       = aws_lb.lb_webserver.arn
-  port                    = var.listener_port
-  protocol                = "HTTP"
+  load_balancer_arn = aws_lb.lb_webserver.arn
+  port              = var.listener_port
+  protocol          = "HTTP"
+
+  # default_action {
+  #   target_group_arn = aws_lb_target_group.tg-webserver.arn
+  #   type             = "forward"
+  # }
 
   default_action {
-    target_group_arn = aws_lb_target_group.tg-webserver.id
-    type             = "forward"
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "404: page not found"
+      status_code  = 404
+    }
   }
+
 }
 
 #---------------------------------------------------------------
@@ -337,17 +373,17 @@ resource "aws_lb_listener" "http" {
 
 resource "aws_lb_listener_rule" "asg_webserver" {
   listener_arn = aws_lb_listener.http.arn
-  priority = 100
+  priority     = 100
 
   condition {
     path_pattern {
-      values = [ "*" ]
+      values = ["*"]
     }
   }
 
   action {
-    type = "forward"
-    target_group_arn = aws_autoscaling_group.asg_webserver.arn
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg-webserver.arn
   }
 }
 
@@ -359,9 +395,9 @@ resource "aws_lb_listener_rule" "asg_webserver" {
 
 resource "aws_launch_configuration" "cfg_webserver" {
 
-  image_id                = var.ec2_image
-  instance_type           = var.ec2_instype
-  security_groups         = [aws_security_group.sg_webserver.id]
+  image_id        = var.ec2_image
+  instance_type   = var.ec2_instype
+  security_groups = [aws_security_group.sg_webserver.id]
 
   user_data = <<-EOF
               #!/bin/bash
@@ -375,25 +411,3 @@ resource "aws_launch_configuration" "cfg_webserver" {
 
 }
 
-#---------------------------------------------------------------
-# Autoscaling group
-#
-#---------------------------------------------------------------
-
-
-resource "aws_autoscaling_group" "asg_webserver" {
-  launch_configuration    = aws_launch_configuration.cfg_webserver.name
-  #vpc_zone_identifier     = data.aws_subnets.vpc_mentoring2.ids
-  vpc_zone_identifier     = [aws_subnet.subnets_private_0.id, aws_subnet.subnets_private_1.id]
-  target_group_arns       = [aws_lb_target_group.tg-webserver.arn]
-  health_check_type       = "ELB"
-
-  min_size                = var.min_size
-  max_size                = var.max_size
-
-  tag {
-    key                   = "Name"
-    value                 = "SG-personal-project-bench"
-    propagate_at_launch   = true
-  }
-}
