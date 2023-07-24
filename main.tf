@@ -84,9 +84,15 @@ resource "aws_subnet" "subnets_public" {
 #
 # 6. Private subnets
 #
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 resource "aws_subnet" "subnets_private_0" {
   vpc_id     = aws_vpc.vpc_mentoring2.id
   cidr_block = local.subnet_cidrs[2]
+  availability_zone = data.aws_availability_zones.available.names[0]
 
   tags = {
     Name = "Subnet_Private-1"
@@ -95,7 +101,7 @@ resource "aws_subnet" "subnets_private_0" {
 resource "aws_subnet" "subnets_private_1" {
   vpc_id     = aws_vpc.vpc_mentoring2.id
   cidr_block = local.subnet_cidrs[3]
-
+  availability_zone = data.aws_availability_zones.available.names[1]
   tags = {
     Name = "Subnet_Private-2"
   }
@@ -175,122 +181,219 @@ resource "aws_route_table_association" "private_1" {
   subnet_id      = aws_subnet.subnets_private_1.id
   route_table_id = aws_route_table.route_table_private.id
 }
+
+
+# ------------------------------------------------------------------------------------------
+
+#---------------------------------------------------------------
+# Security group for Webserver 
 #
-# 12. Default Security Group of VPC
+#---------------------------------------------------------------
+
+resource "aws_security_group" "sg_webserver" {
+
+    name = "sg_webserver"
+    vpc_id = aws_vpc.vpc_mentoring2.id
+
+    ingress  {
+      description   = "ingress to web server"
+      from_port     = var.ini_port
+      to_port       = var.fin_port
+      protocol      = "tcp"      
+      cidr_blocks   = [ "0.0.0.0/0" ]
+    } 
+  
+}
+
+#---------------------------------------------------------------
+# Security group for Load Balancer 
 #
-resource "aws_security_group" "default" {
-  name        = "${var.environment}-default-sg"
-  description = "Default SG to alllow traffic from the VPC"
-  vpc_id      = aws_vpc.vpc_mentoring2.id
-  depends_on = [
-    aws_vpc.vpc_mentoring2
-  ]
+#---------------------------------------------------------------
+
+resource "aws_security_group" "sg_lb" {
+  name = "sg_lb"
+  vpc_id = aws_vpc.vpc_mentoring2.id
+
+  # Allow inbound HTTP requests
 
   ingress {
-    from_port = "0"
-    to_port   = "0"
-    protocol  = "-1"
-    self      = true
+    from_port     = var.ii_port
+    to_port       = var.if_port
+    protocol      = "tcp"
+    cidr_blocks   = ["0.0.0.0/0"]
   }
+
+
+  # Allow outbound requests
 
   egress {
-    from_port = "0"
-    to_port   = "0"
-    protocol  = "-1"
-    self      = "true"
+    from_port     = var.ei_port
+    to_port       = var.ef_port
+    protocol      = "tcp"
+    cidr_blocks   = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Environment = "${var.environment}"
+}
+
+#---------------------------------------------------------------
+# Datasource for VPC's 
+#
+#---------------------------------------------------------------
+
+# data "aws_vpc" "vpc_mentoring2" {
+#   default                = true
+
+#   filter {
+#     name                = "vpc-id"
+#     values              = [data.aws_vpc.vpc_mentoring2.id]
+#   }
+# }
+
+
+# data "aws_subnets" "vpc_mentoring2" {
+# # vpc_id = data.aws_vpc.mentoria2_vpc.id
+  
+#   filter {
+#     name                = "vpc-id"
+#     values              = [data.aws_vpc.vpc_mentoring2.id]
+#   }
+# }
+
+output "vpc_id" {
+  description = "The ID of the VPC"
+  value       = aws_vpc.vpc_mentoring2.id
+}
+
+#---------------------------------------------------------------
+# Target group for web servers balancing
+#
+#---------------------------------------------------------------
+
+resource "aws_lb_target_group" "tg-webserver" {
+  name            = "tg-webserver"
+  port            = var.tg_port
+  protocol        = "HTTP"
+  # vpc_id          = data.aws_vpc.vpc_mentoring2.id
+  vpc_id          = aws_vpc.vpc_mentoring2.id
+
+
+  health_check {
+    path                  = "/"
+    protocol              = "HTTP"
+    matcher               = "200"
+    interval              = 15
+    timeout               = 3
+    healthy_threshold     = 2
+    unhealthy_threshold   = 2
   }
 }
 
-resource "aws_lb" "ALB" {
-  name = "mentoria"
-  load_balancer_type = "application"
-  security_groups = [ aws_security_group.lb.id ]
-  # subnets = [ aws_subnet.subnets_private_0, aws_subnet.subnets_private_1  ]
-  subnets = ["${aws_subnet.subnets_private_0.id}", "${aws_subnet.subnets_private_1.id}"]
-   
+#---------------------------------------------------------------
+# Attachment resource 
+#
+#---------------------------------------------------------------
+
+resource "aws_lb_target_group_attachment" "tg_attachment_webserver" {
+    target_group_arn = aws_lb_target_group.tg-webserver.arn
+    target_id = aws_autoscaling_group.asg_webserver.id
+    port = var.tg_port
+  
 }
+
+#---------------------------------------------------------------
+# Load Balancer definition
+#---------------------------------------------------------------
+
+resource "aws_lb" "lb_webserver" {
+  name                    = "lb-webserver"
+  load_balancer_type      = "application"
+  # subnets                 = data.aws_subnets.vpc_mentoring2
+  subnets                 = [aws_subnet.subnets_private_0.id, aws_subnet.subnets_private_1.id]
+  security_groups         = [aws_security_group.sg_lb.id]
+
+}
+
+#---------------------------------------------------------------
+# Listener definition
+#
+#---------------------------------------------------------------
 
 resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.ALB.arn
-  port = 80
-  protocol = "HTTP"
-  
 
-  # By default, return a simple 404 page
+  load_balancer_arn       = aws_lb.lb_webserver.arn
+  port                    = var.listener_port
+  protocol                = "HTTP"
+
   default_action {
-    type = "fixed-response"
+    target_group_arn = aws_lb_target_group.tg-webserver.id
+    type             = "forward"
+  }
+}
 
-    fixed_response {
-      
-      content_type = "text/plain"
-      message_body = "404: page not found"
-      status_code = 404
+#---------------------------------------------------------------
+# Listener rule for HTTP
+#
+#---------------------------------------------------------------
+
+resource "aws_lb_listener_rule" "asg_webserver" {
+  listener_arn = aws_lb_listener.http.arn
+  priority = 100
+
+  condition {
+    path_pattern {
+      values = [ "*" ]
     }
   }
 
-}
-
-resource "aws_security_group" "lb" {
-  name        = "${var.environment}-default-lb"
-  description = "Default SG to load balancer"
-  vpc_id =  aws_vpc.vpc_mentoring2.id
-  
-
-  ingress {
-    from_port = "80"
-    to_port   = "80"
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port = "80"
-    to_port   = "80"
-    protocol  = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Environment = "${var.environment}"
+  action {
+    type = "forward"
+    target_group_arn = aws_autoscaling_group.asg_webserver.arn
   }
 }
 
+#---------------------------------------------------------------
+# Lanuch configuration for ASG
+#
+#---------------------------------------------------------------
 
-resource "aws_instance" "EC2_private_0" {
-  ami           = var.ec2_image
-  instance_type = var.ec2_instype
-  subnet_id     = aws_subnet.subnets_private_0.id
-  user_data = <<EOF
-          #!/bin/bash
-          set -x
-          yum install -y httpd.x86_64
-          systemctl start httpd.service
-          systemctl enable httpd.service
-          echo "Hello World" > /var/www/html/index.html
-  EOF
-  tags = {
-    Name = "Instance-0"
+
+resource "aws_launch_configuration" "cfg_webserver" {
+
+  image_id                = var.ec2_image
+  instance_type           = var.ec2_instype
+  security_groups         = [aws_security_group.sg_webserver.id]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              echo "Hello, World" > index.html
+              nohup busybox httpd -f -p ${var.server_port} &
+              EOF
+
+  lifecycle {
+    create_before_destroy = true
   }
+
 }
 
-resource "aws_instance" "EC2_private_1" {
-  ami           = var.ec2_image
-  instance_type = var.ec2_instype
-  subnet_id     = aws_subnet.subnets_private_1.id
-  user_data = <<EOF
-          #!/bin/bash
-          set -x
-          yum install -y httpd.x86_64
-          systemctl start httpd.service
-          systemctl enable httpd.service
-          echo "Hello World" > /var/www/html/index.html
-  EOF
-  tags = {
-    Name = "Instance-1"
+#---------------------------------------------------------------
+# Autoscaling group
+#
+#---------------------------------------------------------------
+
+
+resource "aws_autoscaling_group" "asg_webserver" {
+  launch_configuration    = aws_launch_configuration.cfg_webserver.name
+  #vpc_zone_identifier     = data.aws_subnets.vpc_mentoring2.ids
+  vpc_zone_identifier     = [aws_subnet.subnets_private_0.id, aws_subnet.subnets_private_1.id]
+  target_group_arns       = [aws_lb_target_group.tg-webserver.arn]
+  health_check_type       = "ELB"
+
+  min_size                = var.min_size
+  max_size                = var.max_size
+
+  tag {
+    key                   = "Name"
+    value                 = "SG-personal-project-bench"
+    propagate_at_launch   = true
   }
 }
-

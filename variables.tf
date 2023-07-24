@@ -41,3 +41,73 @@ variable "environment" {
   description = "Deployment Environment"
   default     = "dev"
 }
+
+variable "ini_port" {
+  description = "Initial port definition"
+  type = number
+  default = 8080
+}
+
+variable "fin_port" {
+  description = "Final port definition"
+  type = number
+  default = 8080
+}
+
+# Security group for Load Balancer
+
+variable "ii_port" {
+  description = "Initial port definition"
+  type = number
+  default = 80
+}
+
+variable "if_port" {
+  description = "Final port definition"
+  type = number
+  default = 80
+}
+
+variable "ei_port" {
+  description = "Initial port definition"
+  type = number
+  default = 80
+}
+
+variable "ef_port" {
+  description = "Final port definition"
+  type = number
+  default = 80
+}
+
+# Target group for web servers balancing
+
+variable "tg_port" {
+  description = "Port definition"
+  type = number
+  default = 80
+}
+
+variable "server_port" {
+  description = "The port the server will use for HTTP Request"
+  type = string
+  default = "8080"
+}
+
+variable "listener_port" {
+  description = "Listener port"
+  type = number
+  default = 80
+}
+
+variable "min_size" {
+  description = "Min size ASG"
+  type = number
+  default = 2
+}
+
+variable "max_size" {
+  description = "Max size ASG"
+  type = number
+  default = 5
+}
