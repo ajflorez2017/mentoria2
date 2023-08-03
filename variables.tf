@@ -85,7 +85,7 @@ variable "ef_port" {
 variable "tg_port" {
   description = "Port definition"
   type = number
-  default = 80
+  default = 8080
 }
 
 variable "server_port" {

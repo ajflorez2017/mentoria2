@@ -235,6 +235,16 @@ resource "aws_security_group" "sg_lb" {
 
 }
 
+resource "aws_security_group_rule" "allow_8080" {
+  type              = "egress"
+  to_port           = 8080
+  protocol          = "tcp"
+  from_port         = 8080
+  cidr_blocks       = [aws_vpc.vpc_mentoring2.cidr_block]
+  #ipv6_cidr_blocks  = [aws_vpc.example.ipv6_cidr_block]
+  security_group_id = aws_security_group.sg_lb.id
+}
+
 #---------------------------------------------------------------
 # Datasource for VPC's 
 #
@@ -332,10 +342,13 @@ resource "aws_lb_target_group" "tg-webserver" {
 resource "aws_lb" "lb_webserver" {
   name               = "lb-webserver"
   load_balancer_type = "application"
-  # subnets                 = data.aws_subnets.vpc_mentoring2
+  internal           = false
+  # subnets                 = aws_subnet.subnets_public
   subnets         = [aws_subnet.subnets_private_0.id, aws_subnet.subnets_private_1.id]
   security_groups = [aws_security_group.sg_lb.id]
-
+  # subnet_mapping {
+  #   subnet_id     = aws_subnet.subnets_public.id
+  # }
 }
 
 #---------------------------------------------------------------
