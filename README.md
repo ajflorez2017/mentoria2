@@ -40,6 +40,7 @@ No modules.
 | [aws_route_table_association.public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association) | resource |
 | [aws_security_group.sg_lb](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
 | [aws_security_group.sg_webserver](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
+| [aws_security_group_rule.allow_8080](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group_rule) | resource |
 | [aws_subnet.subnets_private_0](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet) | resource |
 | [aws_subnet.subnets_private_1](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet) | resource |
 | [aws_subnet.subnets_public](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet) | resource |
@@ -68,7 +69,7 @@ No modules.
 | <a name="input_nro_subnets_private"></a> [nro\_subnets\_private](#input\_nro\_subnets\_private) | n/a | `number` | `2` | no |
 | <a name="input_nro_subnets_public"></a> [nro\_subnets\_public](#input\_nro\_subnets\_public) | n/a | `number` | `1` | no |
 | <a name="input_server_port"></a> [server\_port](#input\_server\_port) | The port the server will use for HTTP Request | `string` | `"8080"` | no |
-| <a name="input_tg_port"></a> [tg\_port](#input\_tg\_port) | Port definition | `number` | `80` | no |
+| <a name="input_tg_port"></a> [tg\_port](#input\_tg\_port) | Port definition | `number` | `8080` | no |
 | <a name="input_vpc_cidr_global"></a> [vpc\_cidr\_global](#input\_vpc\_cidr\_global) | n/a | `string` | `"192.168.0.0/16"` | no |
 
 ## Outputs
